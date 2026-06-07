@@ -8,6 +8,9 @@
         cube_side_length: 1000.0
         runtime_pos_log_enable: false
         map_file_path: "./test.pcd"
+        odom_frame: odom
+        base_frame: base_link
+        body_frame: livox_frame
 
         common:
             lid_topic:  "/livox/lidar"
