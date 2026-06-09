@@ -656,8 +656,9 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
     odomAftMapped.header.frame_id = odom_frame_;
     odomAftMapped.child_frame_id = base_frame_;
     odomAftMapped.header.stamp = get_ros_time(lidar_end_time);
+    // set_posestamp(odomAftMapped.pose);
 
-    // FAST-LIO pose
+    // transform from body frame to odom frame
     tf2::Transform transform_odom_body;
     transform_odom_body.setOrigin(tf2::Vector3(state_point.pos(0), state_point.pos(1), state_point.pos(2)));
     transform_odom_body.setRotation(tf2::Quaternion(geoQuat.x, geoQuat.y, geoQuat.z, geoQuat.w));
@@ -667,14 +668,27 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
         geometry_msgs::msg::TransformStamped transformMsg = queryTransform(body_frame_, base_frame_);
         tf2::fromMsg(transformMsg.transform, *transform_body_base_);
     }
-    tf2::Transform transform_odom_base = transform_odom_body * (*transform_body_base_);
+    tf2::Transform transform_odom_base = transform_odom_body * *transform_body_base_;
+#ifdef DEBUG
+    double r,p,y;
+    tf2::Matrix3x3 (transform_odom_body.getRotation()).getRPY(r, p, y);
+    std::cout << "FAST-LIO BODY rpy = " << r*180/M_PI << " " << p*180/M_PI << " " << y*180/M_PI << std::endl;
+    std::cout << "FAST-LIO BODY xyz = " << transform_odom_body.getOrigin().x() << " " <<
+        transform_odom_body.getOrigin().y() << " " << transform_odom_body.getOrigin().z() << std::endl;
+    tf2::Matrix3x3(transform_body_base_->getRotation()).getRPY(r,p,y);
+    std::cout << "body->base rpy = " << r*180/M_PI << " " << p*180/M_PI << " " << y*180/M_PI << std::endl;
+    std::cout << "body->base xyz = " << transform_body_base_->getOrigin().x() << " " <<
+        transform_body_base_->getOrigin().y() << " " << transform_body_base_->getOrigin().z() << std::endl;
+    tf2::Matrix3x3(transform_odom_base.getRotation()).getRPY(r,p,y);
+    std::cout << "odom->base rpy = " << r*180/M_PI << " " << p*180/M_PI << " " << y*180/M_PI << std::endl;
+    std::cout << "odom->base xyz = " << transform_odom_base.getOrigin().x() << " " <<
+        transform_odom_base.getOrigin().y() << " " << transform_odom_base.getOrigin().z() << std::endl;
+#endif
 
     odomAftMapped.pose.pose.position.x = transform_odom_base.getOrigin().x();
     odomAftMapped.pose.pose.position.y = transform_odom_base.getOrigin().y();
-    odomAftMapped.pose.pose.position.z = transform_odom_base.getOrigin().z();
+    odomAftMapped.pose.pose.position.z = transform_odom_body.getOrigin().z(); // ignore z
     odomAftMapped.pose.pose.orientation = tf2::toMsg(transform_odom_base.getRotation());
-
-    // set_posestamp(odomAftMapped.pose);
 
     pubOdomAftMapped->publish(odomAftMapped);
     auto P = kf.get_P();
